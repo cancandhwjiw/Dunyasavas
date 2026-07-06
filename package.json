@@ -1,15 +1,12 @@
 {
-  "name": "uygarlik-botu",
+  "name": "savas-strateji-botu",
   "version": "1.0.0",
-  "description": "Ekonomi Botu",
+  "description": "Uygarlık Yönetimi ve Savaş Simülasyonu Botu",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "discord.js": "^14.14.1"
-  },
-  "engines": {
-    "node": "20.x"
   }
 }
