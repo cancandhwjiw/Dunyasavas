@@ -1,7 +1,7 @@
 {
-  "name": "uygarlik-ekonomi-botu",
+  "name": "uygarlik-botu",
   "version": "1.0.0",
-  "description": "Strateji ve ekonomi tabanlı Discord botu",
+  "description": "Ekonomi Botu",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
