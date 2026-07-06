@@ -1,7 +1,7 @@
 {
-  "name": "savas-strateji-botu",
+  "name": "dunyasavas",
   "version": "1.0.0",
-  "description": "Uygarlık Yönetimi ve Savaş Simülasyonu Botu",
+  "description": "Savas ve Strateji Botu",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -10,7 +10,6 @@
     "discord.js": "^14.14.1"
   },
   "engines": {
-    "node": "22.x"
+    "node": "22.23.1"
   }
 }
-
