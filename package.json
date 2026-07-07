@@ -1,7 +1,7 @@
 {
   "name": "uygarlik-botu",
   "version": "1.0.0",
-  "description": "Uygarlık, Ekonomi ve Gelişmiş Savaş Botu",
+  "description": "Uygarlık, Ekonomi ve Savaş Botu",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -10,6 +10,7 @@
     "discord.js": "^14.14.1"
   },
   "engines": {
-    "node": ">=16.11.0"
+    "node": "18.x"
   }
 }
+
