@@ -1,4 +1,4 @@
-{
+{{
   "name": "uygarlik-botu",
   "version": "1.0.0",
   "description": "Uygarlık ve ekonomi botu",
@@ -8,5 +8,8 @@
   },
   "dependencies": {
     "discord.js": "^14.14.1"
+  },
+  "engines": {
+    "node": ">=16.11.0"
   }
 }
