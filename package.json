@@ -1,15 +1,12 @@
 {
-  "name": "discord-krallik-botu",
+  "name": "uygarlik-ekonomi-botu",
   "version": "1.0.0",
-  "description": "Discord Krallık ve Strateji Botu",
+  "description": "Strateji ve ekonomi tabanlı Discord botu",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "discord.js": "^14.15.3"
-  },
-  "engines": {
-    "node": "18.x"
+    "discord.js": "^14.14.1"
   }
 }
