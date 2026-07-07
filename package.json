@@ -1,17 +1,11 @@
-{{
+{
   "name": "uygarlik-botu",
   "version": "1.0.0",
-  "description": "Uygarlık ve ekonomi botu",
-  "main": "index.js",
-"scripts": {
-  "start": "node index.js"
-}
-
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
   },
   "dependencies": {
     "discord.js": "^14.14.1"
-  },
-  "engines": {
-    "node": ">=16.11.0"
   }
 }
