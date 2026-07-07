@@ -1,4 +1,5 @@
-const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, PermissionsBitField } = require('discord.js');
+const fs = require('fs');
 
 const client = new Client({
     intents: [
@@ -8,143 +9,217 @@ const client = new Client({
     ]
 });
 
-// Kurucu Rol ID (Senin belirttiğin rol)
+// Ayarlar ve Yetkili Rol ID
+const PREFIX = ".";
 const OWNER_ROLE_ID = "1523659172904960030";
 
-// Geçici Hafıza (Veritabanı mantığı)
-const userData = new Map();
+// Veritabanı Dosyası (Railway'de kalıcı olması için basit bir JSON veri sistemi)
+const DATA_FILE = './database.json';
+let db = { users: {}, treasury: 0 };
 
-function getProfile(userId) {
-    if (!userData.has(userId)) {
-        userData.set(userId, {
-            ulkeadi: "Kurulmamış",
-            para: 100000,
-            asker: 0,
-            kale: 0,
-            kule: 0,
-            sur: 0
-        });
+if (fs.existsSync(DATA_FILE)) {
+    try {
+        db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+    } catch (e) {
+        console.error("Veritabanı okuma hatası, sıfırlanıyor...", e);
     }
-    return userData.get(userId);
 }
 
-client.on('ready', () => {
-    console.log(`🛡️ Bot ${client.user.tag} olarak giriş yaptı!`);
+function saveDB() {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
+}
+
+// Kullanıcı Verisi Şablonu
+function getUserData(userId) {
+    if (!db.users[userId]) {
+        db.users[userId] = {
+            hasCountry: false,
+            countryName: "Yok",
+            money: 0,
+            soldiers: 0,
+            buildings: { kule: 0, kale: 0, sur: 0 }
+        };
+    }
+    return db.users[userId];
+}
+
+client.once('ready', () => {
+    console.log(`${client.user.tag} aktif! Railway için hazır.`);
 });
 
 client.on('messageCreate', async (message) => {
-    if (message.author.bot || !message.content.startsWith('.')) return;
+    if (message.author.bot || !message.content.startsWith(PREFIX)) return;
 
-    const args = message.content.slice(1).trim().split(/ +/);
+    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    // 1. .ulkekur Komutu
-    if (command === 'ulkekur') {
-        if (!message.member.roles.cache.has(OWNER_ROLE_ID)) {
-            return message.reply("❌ **Hata:** Bu komutu sadece **Kurucular** kullanabilir!");
+    // Yetki Kontrolü Fonksiyonu
+    const isOwner = message.member.roles.cache.has(OWNER_ROLE_ID) || message.member.permissions.has(PermissionsBitField.Flags.Administrator);
+
+    // 1. .profil
+    if (command === "profil") {
+        const target = message.mentions.users.first() || message.author;
+        const data = getUserData(target.id);
+
+        if (!data.hasCountry) {
+            return message.reply(`${target.username} adına kurulmuş bir uygarlık bulunmuyor.`);
         }
 
-        const member = message.mentions.members.first();
-        if (!member) return message.reply("❌ **Hata:** Lütfen ülke kurulacak üyeyi etiketleyin!");
-
-        const ulkeAdi = args.slice(1).join(" ");
-        if (!ulkeAdi) return message.reply("❌ **Hata:** Lütfen kurulacak ülkenin adını yazın!");
-
-        userData.set(member.id, {
-            ulkeadi: ulkeAdi,
-            para: 100000,
-            asker: 0,
-            kale: 0,
-            kule: 0,
-            sur: 0
-        });
-
         const embed = new EmbedBuilder()
-            .setTitle("👑 Yeni Bir Çağ Başlıyor!")
-            .setDescription(`🏰 ${member} liderliğinde **${ulkeAdi}** şanlı uygarlığı resmen kuruldu!\n💰 Başlangıç Hazinesi olarak \`100.000 TL\` teslim edildi.`)
-            .setColor(0x34495e)
-            .setFooter({ text: "⚔️ Ordunu kurmaya başlamak için .askeral yazabilirsin!" });
+            .setTitle(`🏛️ ${data.countryName} Uygarlığı Profili`)
+            .setColor("Blurple")
+            .setThumbnail(target.displayAvatarURL())
+            .addFields(
+                { name: "👑 Hükümdar", value: `${target}`, inline: true },
+                { name: "🌍 Ülke Adı", value: `${data.countryName}`, inline: true },
+                { name: "💰 Para", value: `${data.money} Lira`, inline: true },
+                { name: "🪖 Asker Sayısı", value: `${data.soldiers} Asker`, inline: true },
+                { name: "🏰 İnşa Edilenler", value: `Kule: ${data.buildings.kule} | Kale: ${data.buildings.kale} | Sur: ${data.buildings.sur}` }
+            );
 
         return message.channel.send({ embeds: [embed] });
     }
 
-    // 2. .profil Komutu
-    if (command === 'profil') {
-        const data = getProfile(message.author.id);
+    // 2. .ulkekur
+    if (command === "ulkekur") {
+        if (!isOwner) return message.reply("❌ Bu komutu sadece <@&1523659172904960030> rolüne sahip kişiler kullanabilir.");
+        
+        const target = message.mentions.users.first();
+        const countryName = args.slice(1).join(" ");
+
+        if (!target || !countryName) return message.reply("ℹ️ Doğru Kullanım: `.ulkekur @kullanıcı ÜlkeAdı`");
+
+        const data = getUserData(target.id);
+        data.hasCountry = true;
+        data.countryName = countryName;
+        saveDB();
+
+        return message.reply(`✅ ${target} kullanıcısı için **${countryName}** uygarlığı başarıyla kuruldu!`);
+    }
+
+    // 3. .ulkesil
+    if (command === "ulkesil") {
+        if (!isOwner) return message.reply("❌ Bu komutu sadece <@&1523659172904960030> rolüne sahip kişiler kullanabilir.");
+
+        const target = message.mentions.users.first();
+        if (!target) return message.reply("ℹ️ Doğru Kullanım: `.ulkesil @kullanıcı`");
+
+        if (db.users[target.id]) {
+            delete db.users[target.id];
+            saveDB();
+            return message.reply(`🗑️ ${target} kullanıcısının uygarlığı ve tüm verileri silindi.`);
+        } else {
+            return message.reply("❌ Bu kullanıcının zaten bir uygarlığı yok.");
+        }
+    }
+
+    // 4. .ulkelist
+    if (command === "ulkelist") {
+        let listStr = "";
+        for (const [userId, data] of Object.entries(db.users)) {
+            if (data.hasCountry) {
+                listStr += `• <@${userId}> | **${data.countryName}** — 🪖 ${data.soldiers} Asker | 💰 ${data.money} Lira\n`;
+            }
+        }
 
         const embed = new EmbedBuilder()
-            .setTitle(`👑 ${message.author.username} Uygarlığı ve Şanlı Toprakları 👑`)
-            .setDescription(
-                `🏰 **Ülke Adı:** ${data.ulkeadi}\n\n` +
-                `⚔️ **Yönetilen toprakların son durumu ve askeri güç raporu:**\n\n` +
-                `💰 **Hazine Durumu:** ${data.para} TL\n` +
-                `🪖 **Aktif Ordu Gücü:** ${data.asker} Asker\n\n` +
-                `────────────────────\n` +
-                `🏰 **Merkezi Kale:** ${data.kale} Adet\n` +
-                `🏹 **Savunma Kuleleri:** ${data.kule} Adet\n` +
-                `🧱 **Sınır Surları:** ${data.sur} Adet\n` +
-                `────────────────────`
-            )
-            .setColor(0x34495e)
-            .setFooter({ text: "🛡️ Topraklarını genişletmek ve ordunu güçlendirmek için komutları kullan!" });
+            .setTitle("🌍 Bilinen Tüm Uygarlıkların Listesi")
+            .setColor("Gold")
+            .setDescription(listStr || "Henüz kurulmuş bir uygarlık yok.")
+            .setTimestamp();
 
         return message.channel.send({ embeds: [embed] });
     }
 
-    // 3. .askeral Komutu
-    if (command === 'askeral') {
+    // 5. .hazinekle
+    if (command === "hazinekle") {
+        if (!isOwner) return message.reply("❌ Bu komutu sadece yetkililer kullanabilir.");
         const miktar = parseInt(args[0]);
-        if (!miktar || miktar <= 0 || isNaN(miktar)) {
-            return message.reply("❌ **Hata:** Lütfen geçerli bir miktar girin! Örn: `.askeral 10`");
-        }
+        if (isNaN(miktar) || miktar <= 0) return message.reply("ℹ️ Doğru Kullanım: `.hazinekle miktar`");
 
-        const data = getProfile(message.author.id);
-        const maliyet = miktar * 10;
-
-        if (data.para < maliyet) {
-            return message.reply(`❌ **Hata:** Yeterli altınınınız yok! Gereken: \`${maliyet} TL\` | Sizde Olan: \`${data.para} TL\``);
-        }
-
-        data.para -= maliyet;
-        data.asker += miktar;
-
-        return message.channel.send(`⚔️ **Kışladan Sesler Yükseliyor!**\n\n🪖 Başarıyla **${miktar}** adet asker ordunuza katıldı!\n💰 Güncel durum için \`.profil\` yazabilirsiniz.`);
+        db.treasury = (db.treasury || 0) + miktar;
+        saveDB();
+        return message.reply(`💰 Merkez hazinesine **${miktar} Lira** eklendi! Güncel Hazine: \`${db.treasury} Lira\``);
     }
 
-    // 4. .sifirla Komutu
-    if (command === 'sifirla') {
-        if (!message.member.roles.cache.has(OWNER_ROLE_ID)) {
-            return message.reply("❌ **Hata:** Bu komutu sadece **Kurucular** kullanabilir!");
-        }
+    // 6. .hazineçıkar
+    if (command === "hazineçıkar" || command === "hazinecikar") {
+        if (!isOwner) return message.reply("❌ Bu komutu sadece yetkililer kullanabilir.");
+        const miktar = parseInt(args[0]);
+        if (isNaN(miktar) || miktar <= 0) return message.reply("ℹ️ Doğru Kullanım: `.hazineçıkar miktar`");
 
-        const member = message.mentions.members.first();
-        if (!member) return message.reply("❌ **Hata:** Lütfen sıfırlanacak üyeyi etiketleyin!");
+        if ((db.treasury || 0) < miktar) return message.reply(`❌ Hazinede o kadar para yok! Mevcut hazine: \`${db.treasury} Lira\``);
 
-        if (userData.has(member.id)) {
-            userData.delete(member.id);
-        }
-
-        return message.channel.send(`🔄 ${member} kullanıcısının ülkesi, parası ve tüm askeri verileri başarıyla sıfırlandı!`);
+        db.treasury -= miktar;
+        saveDB();
+        return message.reply(`💸 Merkez hazinesinden **${miktar} Lira** çıkartıldı! Güncel Hazine: \`${db.treasury} Lira\``);
     }
 
-    // 5. -yardim Komutu (Önek olarak çizgi kullanıldığı için ayrıca kontrol ettik)
-    if (message.content.toLowerCase() === '-yardim') {
+    // 7. .bal
+    if (command === "bal") {
+        return message.reply(`🏛️ **Merkez Hazinesi Değeri:** \`${db.treasury || 0} Lira\``);
+    }
+
+    // 8. .inşaaet
+    if (command === "inşaaet" || command === "insaaet") {
+        const data = getUserData(message.author.id);
+        if (!data.hasCountry) return message.reply("❌ Önce bir uygarlığınızın olması gerekir.");
+
+        const secenek = args[0]?.toLowerCase();
+        const adet = parseInt(args[1]) || 1;
+
+        if (!["kule", "kale", "sur"].includes(secenek) || adet <= 0) {
+            return message.reply("ℹ️ Doğru Kullanım: `.inşaaet [kule/kale/sur] [adet]`\nFiyatlar: Kule: 50K, Kale: 100K, Sur: 250K");
+        }
+
+        const fiyatlar = { kule: 50000, kale: 100000, sur: 250000 };
+        const toplamMaliyet = fiyatlar[secenek] * adet;
+
+        if (data.money < toplamMaliyet) {
+            return message.reply(`❌ Yetersiz bakiye! ${adet} adet ${secenek} için **${toplamMaliyet} Lira** gerekiyor. Sende olan: \`${data.money} Lira\``);
+        }
+
+        data.money -= toplamMaliyet;
+        data.buildings[secenek] += adet;
+        saveDB();
+
+        return message.reply(`🏗️ Başarıyla **${adet}** adet **${secenek}** inşa ettiniz! Harcanan: \`${toplamMaliyet} Lira\``);
+    }
+
+    // 9. .askeral
+    if (command === "askeral") {
+        const data = getUserData(message.author.id);
+        if (!data.hasCountry) return message.reply("❌ Önce bir uygarlığınızın olması gerekir.");
+
+        const miktar = parseInt(args[0]);
+        if (isNaN(miktar) || miktar <= 0) return message.reply("ℹ️ Doğru Kullanım: `.askeral [miktar]` (1 Asker = 10 Lira)");
+
+        const toplamMaliyet = miktar * 10;
+
+        if (data.money < toplamMaliyet) {
+            return message.reply(`❌ Paran yetersiz! **${miktar}** asker almak için **${toplamMaliyet} Lira** gerekli. Sende olan: \`${data.money} Lira\``);
+        }
+
+        data.money -= toplamMaliyet;
+        data.soldiers += miktar;
+        saveDB();
+
+        return message.reply(`🪖 Başarıyla ordunuza **${miktar}** yeni asker kattınız! Harcanan: \`${toplamMaliyet} Lira\``);
+    }
+
+    // 10. -yardim
+    if (command === "yardim" || command === "yardım" || message.content === "-yardim") {
         const embed = new EmbedBuilder()
-            .setTitle("📜 Krallık & Strateji Yönetim Rehberi")
-            .setDescription(
-                "**⚔️ Temel Komutlar:**\n" +
-                "• `.profil` ➔ Ülke ve ordu durumu.\n" +
-                "• `.askeral <miktar>` ➔ Asker eğitir (tanesi 10 TL).\n\n" +
-                "**👑 Yetkili Komutları:**\n" +
-                "• `.ulkekur @üye [Ülke Adı]`\n" +
-                "• `.sifirla @üye`"
-            )
-            .setColor(0xd1a119);
-
+            .setTitle("📜 Uygarlık Botu Komut Listesi")
+            .setColor("Green")
+            .addFields(
+                { name: "👥 Herkesin Kullanabileceği Komutlar", value: "`.profil [@kullanıcı]` - Uygarlık durumunu gösterir.\n`.ulkelist` - Aktif uygarlıkları listeler.\n`.inşaaet [kule/kale/sur] [adet]` - Yapı inşa eder.\n`.askeral [miktar]` - Asker satın alır (1 asker = 10 Lira)." },
+                { name: "👑 Owner / Yetkili Komutları", value: "`.ulkekur @kullanıcı [İsim]` - Yeni ülke kurar.\n`.ulkesil @kullanıcı` - Ülkeyi siler.\n`.hazinekle [miktar]` - Merkez hazinesine para atar.\n`.hazineçıkar [miktar]` - Hazineden para çeker.\n`.bal` - Merkez hazinesini görür." }
+            );
         return message.channel.send({ embeds: [embed] });
     }
 });
 
-// Railway Variables kısmından gelen TOKEN ile botu başlatır
-client.login(process.env.TOKEN);
-                                           
+// Bot Tokenini buraya girin veya Railway Environment Variables kısmına DISCORD_TOKEN olarak ekleyin.
+const TOKEN = process.env.DISCORD_TOKEN || "BURAYA_BOT_TOKENINI_YAZ";
+client.login(TOKEN);
