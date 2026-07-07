@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "description": "Uygarlık ve ekonomi botu",
   "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
+"scripts": {
+  "start": "node index.js"
+}
+
   },
   "dependencies": {
     "discord.js": "^14.14.1"
