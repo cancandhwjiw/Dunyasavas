@@ -4,7 +4,6 @@ module.exports = {
     name: 'kur',
     description: 'Sunucu kanallarını otomatik olarak kurar.',
     async execute(message, args) {
-        // Sadece yönetici yetkisi olanların kullanması için
         if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
             return message.reply('❌ Bu komutu kullanmak için **Yönetici** yetkisine sahip olmalısın!');
         }
@@ -45,7 +44,7 @@ module.exports = {
             const catGenel = await guild.channels.create({ name: 'Genel', type: ChannelType.GuildCategory });
             await guild.channels.create({ name: '・Sohbet', type: ChannelType.GuildText, parent: catGenel });
             await guild.channels.create({ name: '・Medya', type: ChannelType.GuildText, parent: catGenel });
-            await guild.channels.create({ name: '🤖・bot-komut', type: ChannelType.GuildText, parent: catGenel }); // Çakışma olmasın diye bot-komut yapıldı
+            await guild.channels.create({ name: '🤖・bot-komut', type: ChannelType.GuildText, parent: catGenel });
             await guild.channels.create({ name: '💡・istek-şikayet', type: ChannelType.GuildText, parent: catGenel });
 
             // 5. Eğlence Kanalları
@@ -111,7 +110,7 @@ module.exports = {
             // 13. Maç Kanalları
             const catMacKanallari = await guild.channels.create({ name: 'Maç Kanalları', type: ChannelType.GuildCategory });
             await guild.channels.create({ name: '📺・bein-sports', type: ChannelType.GuildText, parent: catMacKanallari });
-            await guild.channels.create({ name: '🏟️・bein-tribün', type: ChannelType.GuildVoice, parent: catMacKanallari }); // Tribünleri ses kanalı yaptım
+            await guild.channels.create({ name: '🏟️・bein-tribün', type: ChannelType.GuildVoice, parent: catMacKanallari });
             await guild.channels.create({ name: '📺・exxen-spor', type: ChannelType.GuildText, parent: catMacKanallari });
             await guild.channels.create({ name: '🏟️・exxen-tribün', type: ChannelType.GuildVoice, parent: catMacKanallari });
 
@@ -127,12 +126,11 @@ module.exports = {
             const catTicket = await guild.channels.create({ name: 'Ticketlar', type: ChannelType.GuildCategory });
             await guild.channels.create({ name: '🎫・ticket', type: ChannelType.GuildText, parent: catTicket });
 
-            message.channel.send('✅ **Sunucu şablonu başarıyla kuruldu!** Tüm kategoriler ve kanallar sırasıyla oluşturuldu.');
+            message.channel.send('✅ **Sunucu şablonu başarıyla kuruldu!**');
         } catch (error) {
             console.error(error);
-            message.channel.send('❌ Kanallar oluşturulurken bir hata meydana geldi. Botun **Kanalları Yönet** yetkisi olduğundan emin olun.');
+            message.channel.send('❌ Kanallar oluşturulurken bir hata meydana geldi.');
         }
     },
 };
-
-client.login(TOKEN);                
+                
