@@ -133,4 +133,6 @@ module.exports = {
         }
     },
 };
-                
+
+const TOKEN = "BURAYA_DISCORD_BOT_TOKENİNİ_YAZ";
+
