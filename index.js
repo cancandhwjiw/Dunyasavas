@@ -203,7 +203,7 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// Bot tokenini buraya yapıştır veya Railway ortam değişkenlerinden (Environment Variables) çektir
-const TOKEN = process.env.DISCORD_TOKEN || "BURAYA_BOT_TOKENINI_YAZ";
+// Eski hali: const TOKEN = process.env.DISCORD_TOKEN || "BURAYA_BOT_TOKENINI_YAZ";
+// Yeni hali (Tokenini tırnakların içine yapıştır):
+const TOKEN = "MTA5Mjg3MzM... (buraya kendi botunun uzun token kodunu yapıştır)";
 client.login(TOKEN);
-                        
