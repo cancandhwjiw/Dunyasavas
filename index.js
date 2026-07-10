@@ -1,5 +1,6 @@
 const { Client, GatewayIntentBits, ChannelType, PermissionsBitField } = require('discord.js');
 
+// Botun ihtiyaç duyduğu niyetleri (Intents) en temiz şekilde tanımlıyoruz
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -11,18 +12,17 @@ const client = new Client({
 const PREFIX = ".";
 
 client.once('ready', () => {
-    console.log(`${client.user.tag} aktif ve sunucu kurulumuna hazır!`);
+    console.log(`✅ Bot başarıyla giriş yaptı! Aktif isim: ${client.user.tag}`);
 });
 
 client.on('messageCreate', async (message) => {
+    // Botların kendi mesajlarına yanıt vermesini engeller ve prefix kontrolü yapar
     if (message.author.bot || !message.content.startsWith(PREFIX)) return;
 
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    // .kur komutu
     if (command === "kur") {
-        // Sadece yönetici yetkisi olanlar kurabilsin
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply("❌ Bu komutu kullanmak için **Yönetici** yetkisine sahip olmalısın!");
         }
@@ -30,7 +30,6 @@ client.on('messageCreate', async (message) => {
         const guild = message.guild;
         message.channel.send("🔄 Ultra League sunucu yapısı kuruluyor, lütfen bekleyin...");
 
-        // Kurulacak kategori ve kanal şeması
         const sunucuYapisi = [
             {
                 kategori: "Ultra League",
@@ -155,9 +154,9 @@ client.on('messageCreate', async (message) => {
                 kategori: "Maç Kanalları",
                 kanallar: [
                     { ad: "📺・bein-sports", tip: ChannelType.GuildText },
-                    { ad: "🏟️・bein-tribün", tip: ChannelType.GuildVoice }, // Ses kanalı olarak ayarlandı
+                    { ad: "🏟️・bein-tribün", tip: ChannelType.GuildVoice },
                     { ad: "📺・exxen-spor", tip: ChannelType.GuildText },
-                    { ad: "🏟️・exxen-tribün", tip: ChannelType.GuildVoice } // Ses kanalı olarak ayarlandı
+                    { ad: "🏟️・exxen-tribün", tip: ChannelType.GuildVoice }
                 ]
             },
             {
@@ -179,7 +178,6 @@ client.on('messageCreate', async (message) => {
         ];
 
         try {
-            // Döngüyle sırayla kategorileri ve kanalları oluşturuyoruz
             for (const veri of sunucuYapisi) {
                 const kategoriKanali = await guild.channels.create({
                     name: veri.kategori,
@@ -194,16 +192,22 @@ client.on('messageCreate', async (message) => {
                     });
                 }
             }
-
             return message.channel.send("🎉 **Kurulum Başarıyla Tamamlandı!** Tüm kategoriler ve kanallar eksiksiz şekilde oluşturuldu.");
         } catch (error) {
-            console.error("Kanal oluşturma hatası:", error);
+            console.error("❌ Kanal oluşturma hatası:", error);
             return message.channel.send("❌ Kanallar oluşturulurken bir hata meydana geldi. Bot yetkilerini kontrol edin.");
         }
     }
 });
 
-// Eski hali: const TOKEN = process.env.DISCORD_TOKEN || "BURAYA_BOT_TOKENINI_YAZ";
-// Yeni hali (Tokenini tırnakların içine yapıştır):
-const TOKEN = "MTA5Mjg3MzM... (buraya kendi botunun uzun token kodunu yapıştır)";
-client.login(TOKEN);
+// Hatayı yakalamak için giriş işlemini sarmallıyoruz
+const TOKEN = process.env.DISCORD_TOKEN;
+
+if (!TOKEN || TOKEN === "BURAYA_BOT_TOKENINI_YAZ") {
+    console.error("❌ HATA: Geçerli bir DISCORD_TOKEN bulunamadı! Lütfen Railway Variables kısmından ekleyin.");
+} else {
+    client.login(TOKEN).catch(err => {
+        console.error("❌ Bot giriş yaparken hata oluştu. Tokeninizi ve Intents ayarlarınızı kontrol edin:", err);
+    });
+                    }
+
