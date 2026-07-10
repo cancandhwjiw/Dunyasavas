@@ -1,213 +1,218 @@
-const { Client, GatewayIntentBits, ChannelType, PermissionsBitField } = require('discord.js');
+const { 
+    Client, 
+    GatewayIntentBits, 
+    EmbedBuilder, 
+    ActionRowBuilder, 
+    ButtonBuilder, 
+    ButtonStyle,
+    ComponentType
+} = require('discord.js');
+const fs = require('fs');
 
-// Botun ihtiyaç duyduğu niyetleri (Intents) en temiz şekilde tanımlıyoruz
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers
     ]
 });
 
 const PREFIX = ".";
 
-client.once('ready', () => {
-    console.log(`✅ Bot başarıyla giriş yaptı! Aktif isim: ${client.user.tag}`);
+// ==========================================
+// YENİ ROL VE KANAL TANIMLAMALARI
+// ==========================================
+const ROLLER = {
+    YETKILI: "1525105467393835120",       // Kayıt komutunu ve butonları yöneten yetkili rolü
+    KAYITSIZ: "1525112827784728586",      // Kayıt tamamlandığında ALINACAK rol
+    FUTBOLCU: "1525106349258834031",      // Futbolcu butonuna basınca verilecek rol
+    TEKNIK_DIREKTOR_1: "1525106349258834031", // Teknik Direktör butonuna basınca verilecek 1. rol
+    TEKNIK_DIREKTOR_2: "1525105955023618130"  // Teknik Direktör butonuna basınca verilecek 2. rol
+};
+
+const KANALLAR = {
+    KAYIT_LOG: "1525092983018487809",     // Giriş mesajlarının ve detaylı kayıt logunun düşeceği kanal
+    SOHBET: "1525106525557882973"         // Kayıt işlemi bittiğinde tebrik mesajının gideceği ana sohbet
+};
+
+// ==========================================
+// KULLANICI İSTATİSTİK VERİTABANI
+// ==========================================
+let data = { oyuncular: {} };
+if (fs.existsSync('./database.json')) {
+    try { data = JSON.parse(fs.readFileSync('./database.json', 'utf8')); } catch (e) { data = { oyuncular: {} }; }
+}
+function saveDB() { fs.writeFileSync('./database.json', JSON.stringify(data, null, 2)); }
+
+// ==========================================
+// 1. SUNUCUYA BİRİ GİRDİĞİNDE (HOŞ GELDİN BUTONU)
+// ==========================================
+client.on('guildMemberAdd', async (member) => {
+    const logKanal = member.guild.channels.cache.get(KANALLAR.KAYIT_LOG);
+    if (!logKanal) return;
+
+    // Girişte kayıtsız rolünü otomatik verelim (garanti olsun)
+    await member.roles.add(ROLLER.KAYITSIZ).catch(() => null);
+
+    const hgEmbed = new EmbedBuilder()
+        .setColor('#1e1f22')
+        .setAuthor({ name: `Yeni Bir Kullanıcı Katıldı, 👋`, iconURL: member.guild.iconURL() })
+        .setDescription(`\n${member}!\n\nAstra League'e hoş geldin kralım\n`)
+        .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+        .setFooter({ text: `Nors` });
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`normal_kayit_${member.id}`)
+            .setLabel('Normal Kayıt')
+            .setStyle(ButtonStyle.Primary)
+            .setEmoji('🪪')
+    );
+
+    logKanal.send({ 
+        content: `<@&${ROLLER.YETKILI}>, ${member} sunucuya giriş yaptı.`, 
+        embeds: [hgEmbed],
+        components: [row]
+    });
 });
 
+// ==========================================
+// GİRİŞTEKİ "NORMAL KAYIT" BUTONU ETKİLEŞİMİ
+// ==========================================
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isButton()) return;
+
+    const [prefix, eylem, hedefId] = interaction.customId.split('_');
+    if (prefix !== 'normal' || eylem !== 'kayit') return;
+
+    if (!interaction.member.roles.cache.has(ROLLER.YETKILI)) {
+        return interaction.reply({ content: `❌ Bu butonu sadece <@&${ROLLER.YETKILI}> rolüne sahip yetkililer kullanabilir.`, ephemeral: true });
+    }
+
+    return interaction.reply({
+        content: `📝 Lütfen aşağıdaki komutu kopyalayıp sohbete yapıştırın ve ismi düzenleyin:\n\n\`\`\`.k <@${hedefId}> İsim | POZ | 🇹🇷 | 50G\`\`\``,
+        ephemeral: true
+    });
+});
+
+// ==========================================
+// 2. .K KOMUTU VE FUTBOLCU / TEKNİK DİREKTÖR SEÇİM BUTONLARI
+// ==========================================
 client.on('messageCreate', async (message) => {
-    // Botların kendi mesajlarına yanıt vermesini engeller ve prefix kontrolü yapar
     if (message.author.bot || !message.content.startsWith(PREFIX)) return;
 
     const args = message.content.slice(PREFIX.length).trim().split(/ +/);
     const command = args.shift().toLowerCase();
 
-    if (command === "kur") {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply("❌ Bu komutu kullanmak için **Yönetici** yetkisine sahip olmalısın!");
+    if (command === 'k') {
+        if (!message.member.roles.cache.has(ROLLER.YETKILI)) {
+            return message.reply(`❌ Bu komutu sadece <@&${ROLLER.YETKILI}> yetkilileri kullanabilir.`);
         }
 
-        const guild = message.guild;
-        message.channel.send("🔄 Ultra League sunucu yapısı kuruluyor, lütfen bekleyin...");
+        const hedef = message.mentions.members.first();
+        const yeniIsim = args.slice(1).join(" ");
 
-        const sunucuYapisi = [
-            {
-                kategori: "Ultra League",
-                kanallar: [
-                    { ad: "🎪・takımlar", tip: ChannelType.GuildText },
-                    { ad: "・Kayıt odasi", tip: ChannelType.GuildText }
-                ]
-            },
-            {
-                kategori: "Bilgilendirme",
-                kanallar: [
-                    { ad: "📣・duyuru", tip: ChannelType.GuildText },
-                    { ad: "📦・sistemler", tip: ChannelType.GuildText },
-                    { ad: "📚・kurallar", tip: ChannelType.GuildText },
-                    { ad: "💎・anılar", tip: ChannelType.GuildText },
-                    { ad: "🎭・rol-bilgi", tip: ChannelType.GuildText },
-                    { ad: "🔮・rol-alma", tip: ChannelType.GuildText },
-                    { ad: "🚀・booster", tip: ChannelType.GuildText },
-                    { ad: "📈・seviye", tip: ChannelType.GuildText },
-                    { ad: "✨・yetkili-alım", tip: ChannelType.GuildText },
-                    { ad: "✨・spiker-alım", tip: ChannelType.GuildText },
-                    { ad: "🎙️・spiker-sonuçları", tip: ChannelType.GuildText }
-                ]
-            },
-            {
-                kategori: "Diğer Kanallar",
-                kanallar: [
-                    { ad: "🔔・güncelleme", tip: ChannelType.GuildText },
-                    { ad: "🚀・booster-bilgi", tip: ChannelType.GuildText },
-                    { ad: "🛒・Market", tip: ChannelType.GuildText },
-                    { ad: "🗳️・oy ver", tip: ChannelType.GuildText },
-                    { ad: "🎉event", tip: ChannelType.GuildText },
-                    { ad: "🎊 çekiliş", tip: ChannelType.GuildText }
-                ]
-            },
-            {
-                kategori: "Genel",
-                kanallar: [
-                    { ad: "・Sohnet", tip: ChannelType.GuildText },
-                    { ad: "・Medya", tip: ChannelType.GuildText },
-                    { ad: "🤖・medya", tip: ChannelType.GuildText },
-                    { ad: "💡・istek-şikayet", tip: ChannelType.GuildText }
-                ]
-            },
-            {
-                kategori: "Eğlence Kanalları",
-                kanallar: [
-                    { ad: "💵・owo", tip: ChannelType.GuildText },
-                    { ad: "🏆・turnuva", tip: ChannelType.GuildText },
-                    { ad: "💫・bil-kazan", tip: ChannelType.GuildText }
-                ]
-            },
-            {
-                kategori: "Antrenman",
-                kanallar: [
-                    { ad: "🎽・antrenman", tip: ChannelType.GuildText },
-                    { ad: "🥅・penaltı-antrenman", tip: ChannelType.GuildText },
-                    { ad: "🎽・antrenman-bilgi", tip: ChannelType.GuildText }
-                ]
-            },
-            {
-                kategori: "7. Değer İsteme & Bütçe İsteme",
-                kanallar: [
-                    { ad: "📊・değer-bütçe-kasma", tip: ChannelType.GuildText },
-                    { ad: "💸・değer-bütçe-isteme", tip: ChannelType.GuildText },
-                    { ad: "🔍・değer-bütçe-bildiri", tip: ChannelType.GuildText }
-                ]
-            },
-            {
-                kategori: "Sosyal Medya",
-                kanallar: [
-                    { ad: "🌐・twitter", tip: ChannelType.GuildText },
-                    { ad: "📷・instagram", tip: ChannelType.GuildText },
-                    { ad: "🎵・tiktok", tip: ChannelType.GuildText },
-                    { ad: "📰・ultra-haber", tip: ChannelType.GuildText }
-                ]
-            },
-            {
-                kategori: "efsane",
-                kanallar: [
-                    { ad: "💰・en-değerli-futbolcular", tip: ChannelType.GuildText },
-                    { ad: "💰・en-değerli-takımlar", tip: ChannelType.GuildText },
-                    { ad: "🏛️・müze", tip: ChannelType.GuildText },
-                    { ad: "⭐・efsaneler", tip: ChannelType.GuildText }
-                ]
-            },
-            {
-                kategori: "Ultra Lig",
-                kanallar: [
-                    { ad: "🏆・puan-durumu", tip: ChannelType.GuildText },
-                    { ad: "📅・fikstür", tip: ChannelType.GuildText },
-                    { ad: "📝・maç-sonuçları", tip: ChannelType.GuildText },
-                    { ad: "⚽・gol-krallığı", tip: ChannelType.GuildText },
-                    { ad: "⚽・asist-krallığı", tip: ChannelType.GuildText },
-                    { ad: "🏥・sakatlıklar", tip: ChannelType.GuildText },
-                    { ad: "🟥・cezalılar", tip: ChannelType.GuildText },
-                    { ad: "🥅・kadrolar", tip: ChannelType.GuildText },
-                    { ad: "👑・sezonun-oyuncusu", tip: ChannelType.GuildText },
-                    { ad: "👑・haftanın-oyuncusu", tip: ChannelType.GuildText }
-                ]
-            },
-            {
-                kategori: "Ultra Cup",
-                kanallar: [
-                    { ad: "📅・fikstür", tip: ChannelType.GuildText },
-                    { ad: "📝・maç-sonuçları", tip: ChannelType.GuildText },
-                    { ad: "⚽・gol-krallığı", tip: ChannelType.GuildText },
-                    { ad: "⚽・asist-krallığı", tip: ChannelType.GuildText },
-                    { ad: "🟥・cezalılar", tip: ChannelType.GuildText },
-                    { ad: "🥅・kadrolar-cup", tip: ChannelType.GuildText }
-                ]
-            },
-            {
-                kategori: "Ultra Süper Cup",
-                kanallar: [
-                    { ad: "📅・fikstür", tip: ChannelType.GuildText },
-                    { ad: "🔍・maç-sonuçları", tip: ChannelType.GuildText },
-                    { ad: "👑・krallıklar", tip: ChannelType.GuildText }
-                ]
-            },
-            {
-                kategori: "Maç Kanalları",
-                kanallar: [
-                    { ad: "📺・bein-sports", tip: ChannelType.GuildText },
-                    { ad: "🏟️・bein-tribün", tip: ChannelType.GuildVoice },
-                    { ad: "📺・exxen-spor", tip: ChannelType.GuildText },
-                    { ad: "🏟️・exxen-tribün", tip: ChannelType.GuildVoice }
-                ]
-            },
-            {
-                kategori: "Transfer",
-                kanallar: [
-                    { ad: "🚧・transfer-kuralları", tip: ChannelType.GuildText },
-                    { ad: "✅・kap", tip: ChannelType.GuildText },
-                    { ad: "🔍・takım-arama", tip: ChannelType.GuildText },
-                    { ad: "💷・transfer-masası", tip: ChannelType.GuildText },
-                    { ad: "📋・kap-bilgi", tip: ChannelType.GuildText }
-                ]
-            },
-            {
-                kategori: "Ticketlar",
-                kanallar: [
-                    { ad: "🎫・ticket", tip: ChannelType.GuildText }
-                ]
-            }
-        ];
-
-        try {
-            for (const veri of sunucuYapisi) {
-                const kategoriKanali = await guild.channels.create({
-                    name: veri.kategori,
-                    type: ChannelType.GuildCategory
-                });
-
-                for (const kanal of veri.kanallar) {
-                    await guild.channels.create({
-                        name: kanal.ad,
-                        type: kanal.tip,
-                        parent: kategoriKanali.id
-                    });
-                }
-            }
-            return message.channel.send("🎉 **Kurulum Başarıyla Tamamlandı!** Tüm kategoriler ve kanallar eksiksiz şekilde oluşturuldu.");
-        } catch (error) {
-            console.error("❌ Kanal oluşturma hatası:", error);
-            return message.channel.send("❌ Kanallar oluşturulurken bir hata meydana geldi. Bot yetkilerini kontrol edin.");
+        if (!hedef || !yeniIsim) {
+            return message.reply("❌ **Yanlış Kullanım!** Örnek:\n`.k @kullanıcı C.Ronaldo | SNT | 🇵🇹 | 52G` ");
         }
+
+        // Futbolcu ve Teknik Direktör Seçim Butonları
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId(`kayit_futbolcu_${hedef.id}`)
+                .setLabel('Futbolcu Kayıt')
+                .setStyle(ButtonStyle.Primary)
+                .setEmoji('⚽'),
+            new ButtonBuilder()
+                .setCustomId(`kayit_td_${hedef.id}`)
+                .setLabel('Teknik Direktör Kayıt')
+                .setStyle(ButtonStyle.Success)
+                .setEmoji('📋')
+        );
+
+        const msg = await message.reply({
+            content: `⏳ ${hedef} kullanıcısının mesleğini/rolünü aşağıdaki butonlardan seçin:`,
+            components: [row]
+        });
+
+        const filter = i => i.user.id === message.author.id;
+        const collector = msg.createMessageComponentCollector({ filter, componentType: ComponentType.Button, time: 60000 });
+
+        collector.on('collect', async (i) => {
+            await i.deferUpdate();
+            
+            const [,, secilenHedefId] = i.customId.split('_');
+            const üye = message.guild.members.cache.get(secilenHedefId);
+            if (!üye) return i.followUp({ content: "❌ Kullanıcı sunucudan ayrılmış.", ephemeral: true });
+
+            let verilenRollerMetni = "";
+
+            // Buton türüne göre rol işlemlerini ayarlayalım
+            if (i.customId.startsWith('kayit_futbolcu_')) {
+                // Futbolcu rolü verilir
+                await üye.roles.add(ROLLER.FUTBOLCU).catch(() => null);
+                verilenRollerMetni = `<@&${ROLLER.FUTBOLCU}>`;
+            } else if (i.customId.startsWith('kayit_td_')) {
+                // Teknik direktör için 2 rol birden verilir
+                await üye.roles.add([ROLLER.TEKNIK_DIREKTOR_1, ROLLER.TEKNIK_DIREKTOR_2]).catch(() => null);
+                verilenRollerMetni = `<@&${ROLLER.TEKNIK_DIREKTOR_1}>, <@&${ROLLER.TEKNIK_DIREKTOR_2}>`;
+            }
+
+            // İstediğin gibi: BUTONA BASILDIKTAN SONRA KAYITSIZ ROLÜ ALINIR
+            await üye.roles.remove(ROLLER.KAYITSIZ).catch(() => null);
+            
+            // İsmi değiştirilir
+            await üye.setNickname(yeniIsim).catch(() => null);
+
+            // Yetkilinin istatistiğini kaydet
+            if (!data.oyuncular[message.author.id]) data.oyuncular[message.author.id] = { kayitSayisi: 0 };
+            data.oyuncular[message.author.id].kayitSayisi += 1;
+            saveDB();
+
+            // LOG KANALINA GİDEN EMBED (Kayıt Bilgileri)
+            const logKanal = message.guild.channels.cache.get(KANALLAR.KAYIT_LOG);
+            if (logKanal) {
+                const logEmbed = new EmbedBuilder()
+                    .setColor('#1e1f22')
+                    .setTitle('💙 Kayıt Yapıldı!')
+                    .setDescription(
+                        `**Kayıt Bilgileri**\n\n` +
+                        `• **Kayıt Edilen Kullanıcı:** ${üye}\n` +
+                        `• **Kayıt Eden Kullanıcı:** ${message.author}\n` +
+                        `• **Verilen Roller:** ${verilenRollerMetni}\n` +
+                        `• **Yeni İsim:** \`${yeniIsim}\`\n` +
+                        `• **Kayıt Türü:** Normal`
+                    )
+                    .setThumbnail(üye.user.displayAvatarURL({ dynamic: true }))
+                    .setFooter({ text: `${message.author.username}, normal kayıt sayın: ${data.oyuncular[message.author.id].kayitSayisi}`, iconURL: message.author.displayAvatarURL() });
+                
+                logKanal.send({ embeds: [logEmbed] });
+            }
+
+            // ANA SOHBET KANALINA GİDEN EMBED (Tebrik/Hoşgeldin)
+            const sohbetKanal = message.guild.channels.cache.get(KANALLAR.SOHBET);
+            if (sohbetKanal) {
+                const sohbetEmbed = new EmbedBuilder()
+                    .setColor('#1e1f22')
+                    .setAuthor({ name: 'Kayıt Yapıldı!', iconURL: message.guild.iconURL() })
+                    .setDescription(`🔹 ${üye} aramıza **${verilenRollerMetni}** rolleriyle katıldı.\n\n• **Kaydı gerçekleştiren yetkili**\n${message.author}\n\n• **Aramıza hoş geldin**\n${üye}`)
+                    .setThumbnail(üye.user.displayAvatarURL({ dynamic: true }))
+                    .setFooter({ text: 'Nors Kayıt Sistemi' });
+
+                sohbetKanal.send({ content: `${üye} aramıza katıldı.`, embeds: [sohbetEmbed] });
+            }
+
+            // Arayüzü temizle ve collector'ı bitir
+            await msg.edit({ content: `✅ ${üye} kullanıcısının kaydı başarıyla tamamlandı! Rolleri verildi ve kayıtsız rolü alındı.`, components: [] });
+            collector.stop();
+        });
     }
 });
 
-// Hatayı yakalamak için giriş işlemini sarmallıyoruz
-const TOKEN = process.env.DISCORD_TOKEN;
+client.once('ready', () => {
+    console.log(`[BOT] ${client.user.tag} yeni çift butonlu ve otomatik kayıtsız almalı sistemle aktif!`);
+});
 
-if (!TOKEN || TOKEN === "BURAYA_BOT_TOKENINI_YAZ") {
-    console.error("❌ HATA: Geçerli bir DISCORD_TOKEN bulunamadı! Lütfen Railway Variables kısmından ekleyin.");
-} else {
-    client.login(TOKEN).catch(err => {
-        console.error("❌ Bot giriş yaparken hata oluştu. Tokeninizi ve Intents ayarlarınızı kontrol edin:", err);
-    });
-                    }
+client.login(process.env.TOKEN);
 
