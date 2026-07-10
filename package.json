@@ -1,15 +1,12 @@
 {
-  "name": "uygarlik-botu",
+  "name": "nors-kayit-bot",
   "version": "1.0.0",
-  "description": "Ultra League Sunucu Kurucu",
+  "description": "Discord kayıt sistemi botu",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "discord.js": "^14.14.1"
-  },
-  "engines": {
-    "node": "18.x"
   }
 }
