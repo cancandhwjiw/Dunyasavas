@@ -1,11 +1,15 @@
-{{
-  "name": "discord-bot",
+{
+  "name": "uygarlik-botu",
   "version": "1.0.0",
+  "description": "Ultra League Sunucu Kurucu",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "discord.js": "^14.14.1"
+  },
+  "engines": {
+    "node": "18.x"
   }
 }
