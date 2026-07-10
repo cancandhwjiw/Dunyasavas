@@ -58,7 +58,7 @@ client.on('guildMemberAdd', async (member) => {
     const hgEmbed = new EmbedBuilder()
         .setColor('#1e1f22')
         .setAuthor({ name: `Yeni Bir Kullanıcı Katıldı, 👋`, iconURL: member.guild.iconURL() })
-        .setDescription(`\n${member}!\n\nAstra League'e hoş geldin kralım\n`)
+        .setDescription(`\n${member}!\n\nUltra League'e hoş geldin kralım\n`)
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
         .setFooter({ text: `Nors` });
 
